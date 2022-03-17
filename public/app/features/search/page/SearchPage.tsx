@@ -10,6 +10,7 @@ import Page from 'app/core/components/Page/Page';
 import { SearchPageDashboards } from './SearchPageDashboards';
 import { loadResults } from './state/actions';
 import { StoreState } from 'app/types';
+import { Table } from './table/Table';
 
 const node: NavModelItem = {
   id: 'search',
@@ -38,6 +39,8 @@ export default function SearchPage() {
     return <div className={styles.unsupported}>Unsupported</div>;
   }
 
+  console.log(results?.body, 'what are these');
+
   return (
     <Page navModel={{ node: node, main: node }}>
       <Page.Contents>
@@ -55,6 +58,7 @@ export default function SearchPage() {
               {({ width }) => {
                 return (
                   <div>
+                    <Table data={results?.body!} width={width} />
                     <SearchPageDashboards dashboards={results?.body!} width={width} />
                   </div>
                 );
