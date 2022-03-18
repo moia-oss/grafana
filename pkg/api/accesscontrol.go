@@ -28,6 +28,7 @@ const (
 var (
 	ScopeProvisionersAll           = ac.Scope("provisioners", "*")
 	ScopeProvisionersDashboards    = ac.Scope("provisioners", "dashboards")
+	ScopeProvisionersPanelElements = ac.Scope("provisioners", "panels-elements")
 	ScopeProvisionersPlugins       = ac.Scope("provisioners", "plugins")
 	ScopeProvisionersDatasources   = ac.Scope("provisioners", "datasources")
 	ScopeProvisionersNotifications = ac.Scope("provisioners", "notifications")
