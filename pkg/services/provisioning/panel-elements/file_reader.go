@@ -1,4 +1,4 @@
-package dashboards
+package panelelements
 
 import (
 	"context"
@@ -15,7 +15,7 @@ import (
 	"github.com/grafana/grafana/pkg/components/simplejson"
 	"github.com/grafana/grafana/pkg/infra/log"
 	"github.com/grafana/grafana/pkg/models"
-	"github.com/grafana/grafana/pkg/services/dashboards"
+	"github.com/grafana/grafana/pkg/services/LibraryElementss"
 	"github.com/grafana/grafana/pkg/util"
 )
 
@@ -24,29 +24,29 @@ var (
 	ErrFolderNameMissing = errors.New("folder name missing")
 )
 
-// FileReader is responsible for reading dashboards from disk and
-// insert/update dashboards to the Grafana database using
-// `dashboards.DashboardProvisioningService`.
+// FileReader is responsible for reading LibraryElementss from disk and
+// insert/update LibraryElementss to the Grafana database using
+// `LibraryElementss.LibraryElementsProvisioningService`.
 type FileReader struct {
-	Cfg                          *config
-	Path                         string
-	log                          log.Logger
-	dashboardProvisioningService dashboards.DashboardProvisioningService
-	FoldersFromFilesStructure    bool
+	Cfg                                *config
+	Path                               string
+	log                                log.Logger
+	LibraryElementsProvisioningService LibraryElementss.LibraryElementsProvisioningService
+	FoldersFromFilesStructure          bool
 
 	mux                     sync.RWMutex
 	usageTracker            *usageTracker
 	dbWriteAccessRestricted bool
 }
 
-// NewDashboardFileReader returns a new filereader based on `config`
-func NewDashboardFileReader(cfg *config, log log.Logger, service dashboards.DashboardProvisioningService) (*FileReader, error) {
+// NewLibraryElementsFileReader returns a new filereader based on `config`
+func NewLibraryElementsFileReader(cfg *config, log log.Logger, service LibraryElementss.LibraryElementsProvisioningService) (*FileReader, error) {
 	var path string
 	path, ok := cfg.Options["path"].(string)
 	if !ok {
 		path, ok = cfg.Options["folder"].(string)
 		if !ok {
-			return nil, fmt.Errorf("failed to load dashboards, path param is not a string")
+			return nil, fmt.Errorf("failed to load LibraryElementss, path param is not a string")
 		}
 
 		log.Warn("[Deprecated] The folder property is deprecated. Please use path instead.")
@@ -58,12 +58,12 @@ func NewDashboardFileReader(cfg *config, log log.Logger, service dashboards.Dash
 	}
 
 	return &FileReader{
-		Cfg:                          cfg,
-		Path:                         path,
-		log:                          log,
-		dashboardProvisioningService: service,
-		FoldersFromFilesStructure:    foldersFromFilesStructure,
-		usageTracker:                 newUsageTracker(),
+		Cfg:                                cfg,
+		Path:                               path,
+		log:                                log,
+		LibraryElementsProvisioningService: service,
+		FoldersFromFilesStructure:          foldersFromFilesStructure,
+		usageTracker:                       newUsageTracker(),
 	}, nil
 }
 
@@ -74,7 +74,7 @@ func (fr *FileReader) pollChanges(ctx context.Context) {
 		select {
 		case <-ticker.C:
 			if err := fr.walkDisk(ctx); err != nil {
-				fr.log.Error("failed to search for dashboards", "error", err)
+				fr.log.Error("failed to search for LibraryElementss", "error", err)
 			}
 		case <-ctx.Done():
 			return
@@ -82,7 +82,7 @@ func (fr *FileReader) pollChanges(ctx context.Context) {
 	}
 }
 
-// walkDisk traverses the file system for the defined path, reading dashboard definition files,
+// walkDisk traverses the file system for the defined path, reading LibraryElements definition files,
 // and applies any change to the database.
 func (fr *FileReader) walkDisk(ctx context.Context) error {
 	fr.log.Debug("Start walking disk", "path", fr.Path)
@@ -91,7 +91,7 @@ func (fr *FileReader) walkDisk(ctx context.Context) error {
 		return err
 	}
 
-	provisionedDashboardRefs, err := getProvisionedDashboardsByPath(fr.dashboardProvisioningService, fr.Cfg.Name)
+	provisionedLibraryElementsRefs, err := getProvisionedLibraryElementssByPath(fr.LibraryElementsProvisioningService, fr.Cfg.Name)
 	if err != nil {
 		return err
 	}
@@ -102,13 +102,13 @@ func (fr *FileReader) walkDisk(ctx context.Context) error {
 		return err
 	}
 
-	fr.handleMissingDashboardFiles(ctx, provisionedDashboardRefs, filesFoundOnDisk)
+	fr.handleMissingLibraryElementsFiles(ctx, provisionedLibraryElementsRefs, filesFoundOnDisk)
 
 	usageTracker := newUsageTracker()
 	if fr.FoldersFromFilesStructure {
-		err = fr.storeDashboardsInFoldersFromFileStructure(ctx, filesFoundOnDisk, provisionedDashboardRefs, resolvedPath, usageTracker)
+		err = fr.storeLibraryElementssInFoldersFromFileStructure(ctx, filesFoundOnDisk, provisionedLibraryElementsRefs, resolvedPath, usageTracker)
 	} else {
-		err = fr.storeDashboardsInFolder(ctx, filesFoundOnDisk, provisionedDashboardRefs, usageTracker)
+		err = fr.storeLibraryElementssInFolder(ctx, filesFoundOnDisk, provisionedLibraryElementsRefs, usageTracker)
 	}
 	if err != nil {
 		return err
@@ -135,7 +135,7 @@ func (fr *FileReader) isDatabaseAccessRestricted() bool {
 	return fr.dbWriteAccessRestricted
 }
 
-// storeDashboardsInFolder saves dashboards from the filesystem on disk to the folder from config
+// storeLibraryElementssInFolder saves dashboards from the filesystem on disk to the folder from config
 func (fr *FileReader) storeDashboardsInFolder(ctx context.Context, filesFoundOnDisk map[string]os.FileInfo,
 	dashboardRefs map[string]*models.DashboardProvisioning, usageTracker *usageTracker) error {
 	folderID, err := fr.getOrCreateFolderID(ctx, fr.Cfg, fr.dashboardProvisioningService, fr.Cfg.Folder)
@@ -183,53 +183,53 @@ func (fr *FileReader) storeDashboardsInFoldersFromFileStructure(ctx context.Cont
 }
 
 // handleMissingDashboardFiles will unprovision or delete dashboards which are missing on disk.
-func (fr *FileReader) handleMissingDashboardFiles(ctx context.Context, provisionedDashboardRefs map[string]*models.DashboardProvisioning,
+func (fr *FileReader) handleMissingLibraryElementsFiles(ctx context.Context, provisionedLibraryElementsRefs map[string]*models.LibraryElementsProvisioning,
 	filesFoundOnDisk map[string]os.FileInfo) {
-	// find dashboards to delete since json file is missing
-	var dashboardsToDelete []int64
-	for path, provisioningData := range provisionedDashboardRefs {
+	// find LibraryElementss to delete since json file is missing
+	var LibraryElementssToDelete []int64
+	for path, provisioningData := range provisionedLibraryElementsRefs {
 		_, existsOnDisk := filesFoundOnDisk[path]
 		if !existsOnDisk {
-			dashboardsToDelete = append(dashboardsToDelete, provisioningData.DashboardId)
+			LibraryElementssToDelete = append(LibraryElementssToDelete, provisioningData.LibraryElementsId)
 		}
 	}
 
 	if fr.Cfg.DisableDeletion {
-		// If deletion is disabled for the provisioner we just remove provisioning metadata about the dashboard
-		// so afterwards the dashboard is considered unprovisioned.
-		for _, dashboardID := range dashboardsToDelete {
-			fr.log.Debug("unprovisioning provisioned dashboard. missing on disk", "id", dashboardID)
-			err := fr.dashboardProvisioningService.UnprovisionDashboard(ctx, dashboardID)
+		// If deletion is disabled for the provisioner we just remove provisioning metadata about the LibraryElements
+		// so afterwards the LibraryElements is considered unprovisioned.
+		for _, LibraryElementsID := range LibraryElementssToDelete {
+			fr.log.Debug("unprovisioning provisioned LibraryElements. missing on disk", "id", LibraryElementsID)
+			err := fr.LibraryElementsProvisioningService.UnprovisionLibraryElements(ctx, LibraryElementsID)
 			if err != nil {
-				fr.log.Error("failed to unprovision dashboard", "dashboard_id", dashboardID, "error", err)
+				fr.log.Error("failed to unprovision LibraryElements", "LibraryElements_id", LibraryElementsID, "error", err)
 			}
 		}
 	} else {
-		// delete dashboards missing JSON file
-		for _, dashboardID := range dashboardsToDelete {
-			fr.log.Debug("deleting provisioned dashboard, missing on disk", "id", dashboardID)
-			err := fr.dashboardProvisioningService.DeleteProvisionedDashboard(ctx, dashboardID, fr.Cfg.OrgID)
+		// delete LibraryElementss missing JSON file
+		for _, LibraryElementsID := range LibraryElementssToDelete {
+			fr.log.Debug("deleting provisioned LibraryElements, missing on disk", "id", LibraryElementsID)
+			err := fr.LibraryElementsProvisioningService.DeleteProvisionedLibraryElements(ctx, LibraryElementsID, fr.Cfg.OrgID)
 			if err != nil {
-				fr.log.Error("failed to delete dashboard", "id", dashboardID, "error", err)
+				fr.log.Error("failed to delete LibraryElements", "id", LibraryElementsID, "error", err)
 			}
 		}
 	}
 }
 
-// saveDashboard saves or updates the dashboard provisioning file at path.
-func (fr *FileReader) saveDashboard(ctx context.Context, path string, folderID int64, fileInfo os.FileInfo,
-	provisionedDashboardRefs map[string]*models.DashboardProvisioning) (provisioningMetadata, error) {
+// saveLibraryElements saves or updates the LibraryElements provisioning file at path.
+func (fr *FileReader) saveLibraryElements(ctx context.Context, path string, folderID int64, fileInfo os.FileInfo,
+	provisionedLibraryElementsRefs map[string]*models.LibraryElementsProvisioning) (provisioningMetadata, error) {
 	provisioningMetadata := provisioningMetadata{}
 	resolvedFileInfo, err := resolveSymlink(fileInfo, path)
 	if err != nil {
 		return provisioningMetadata, err
 	}
 
-	provisionedData, alreadyProvisioned := provisionedDashboardRefs[path]
+	provisionedData, alreadyProvisioned := provisionedLibraryElementsRefs[path]
 
-	jsonFile, err := fr.readDashboardFromFile(path, resolvedFileInfo.ModTime(), folderID)
+	jsonFile, err := fr.readLibraryElementsFromFile(path, resolvedFileInfo.ModTime(), folderID)
 	if err != nil {
-		fr.log.Error("failed to load dashboard from ", "file", path, "error", err)
+		fr.log.Error("failed to load LibraryElements from ", "file", path, "error", err)
 		return provisioningMetadata, nil
 	}
 
@@ -239,51 +239,51 @@ func (fr *FileReader) saveDashboard(ctx context.Context, path string, folderID i
 	}
 
 	// keeps track of which UIDs and titles we have already provisioned
-	dash := jsonFile.dashboard
-	provisioningMetadata.uid = dash.Dashboard.Uid
-	provisioningMetadata.identity = dashboardIdentity{title: dash.Dashboard.Title, folderID: dash.Dashboard.FolderId}
+	dash := jsonFile.LibraryElements
+	provisioningMetadata.uid = dash.LibraryElements.Uid
+	provisioningMetadata.identity = LibraryElementsIdentity{title: dash.LibraryElements.Title, folderID: dash.LibraryElements.FolderId}
 
 	if upToDate {
 		return provisioningMetadata, nil
 	}
 
-	if dash.Dashboard.Id != 0 {
-		dash.Dashboard.Data.Set("id", nil)
-		dash.Dashboard.Id = 0
+	if dash.LibraryElements.Id != 0 {
+		dash.LibraryElements.Data.Set("id", nil)
+		dash.LibraryElements.Id = 0
 	}
 
 	if alreadyProvisioned {
-		dash.Dashboard.SetId(provisionedData.DashboardId)
+		dash.LibraryElements.SetId(provisionedData.LibraryElementsId)
 	}
 
 	if !fr.isDatabaseAccessRestricted() {
-		fr.log.Debug("saving new dashboard", "provisioner", fr.Cfg.Name, "file", path, "folderId", dash.Dashboard.FolderId)
-		dp := &models.DashboardProvisioning{
+		fr.log.Debug("saving new LibraryElements", "provisioner", fr.Cfg.Name, "file", path, "folderId", dash.LibraryElements.FolderId)
+		dp := &models.LibraryElementsProvisioning{
 			ExternalId: path,
 			Name:       fr.Cfg.Name,
 			Updated:    resolvedFileInfo.ModTime().Unix(),
 			CheckSum:   jsonFile.checkSum,
 		}
-		_, err := fr.dashboardProvisioningService.SaveProvisionedDashboard(ctx, dash, dp)
+		_, err := fr.LibraryElementsProvisioningService.SaveProvisionedLibraryElements(ctx, dash, dp)
 		if err != nil {
 			return provisioningMetadata, err
 		}
 	} else {
-		fr.log.Warn("Not saving new dashboard due to restricted database access", "provisioner", fr.Cfg.Name,
-			"file", path, "folderId", dash.Dashboard.FolderId)
+		fr.log.Warn("Not saving new LibraryElements due to restricted database access", "provisioner", fr.Cfg.Name,
+			"file", path, "folderId", dash.LibraryElements.FolderId)
 	}
 
 	return provisioningMetadata, nil
 }
 
-func getProvisionedDashboardsByPath(service dashboards.DashboardProvisioningService, name string) (
-	map[string]*models.DashboardProvisioning, error) {
-	arr, err := service.GetProvisionedDashboardData(name)
+func getProvisionedLibraryElementssByPath(service LibraryElementss.LibraryElementsProvisioningService, name string) (
+	map[string]*models.LibraryElementsProvisioning, error) {
+	arr, err := service.GetProvisionedLibraryElementsData(name)
 	if err != nil {
 		return nil, err
 	}
 
-	byPath := map[string]*models.DashboardProvisioning{}
+	byPath := map[string]*models.LibraryElementsProvisioning{}
 	for _, pd := range arr {
 		byPath[pd.ExternalId] = pd
 	}
@@ -291,28 +291,28 @@ func getProvisionedDashboardsByPath(service dashboards.DashboardProvisioningServ
 	return byPath, nil
 }
 
-func (fr *FileReader) getOrCreateFolderID(ctx context.Context, cfg *config, service dashboards.DashboardProvisioningService, folderName string) (int64, error) {
+func (fr *FileReader) getOrCreateFolderID(ctx context.Context, cfg *config, service LibraryElementss.LibraryElementsProvisioningService, folderName string) (int64, error) {
 	if folderName == "" {
 		return 0, ErrFolderNameMissing
 	}
 
-	cmd := &models.GetDashboardQuery{Slug: models.SlugifyTitle(folderName), OrgId: cfg.OrgID}
+	cmd := &models.GetLibraryElementsQuery{Slug: models.SlugifyTitle(folderName), OrgId: cfg.OrgID}
 	err := bus.Dispatch(ctx, cmd)
 
-	if err != nil && !errors.Is(err, models.ErrDashboardNotFound) {
+	if err != nil && !errors.Is(err, models.ErrLibraryElementsNotFound) {
 		return 0, err
 	}
 
-	// dashboard folder not found. create one.
-	if errors.Is(err, models.ErrDashboardNotFound) {
-		dash := &dashboards.SaveDashboardDTO{}
-		dash.Dashboard = models.NewDashboardFolder(folderName)
-		dash.Dashboard.IsFolder = true
+	// LibraryElements folder not found. create one.
+	if errors.Is(err, models.ErrLibraryElementsNotFound) {
+		dash := &LibraryElementss.SaveLibraryElementsDTO{}
+		dash.LibraryElements = models.NewLibraryElementsFolder(folderName)
+		dash.LibraryElements.IsFolder = true
 		dash.Overwrite = true
 		dash.OrgId = cfg.OrgID
-		// set dashboard folderUid if given
-		dash.Dashboard.SetUid(cfg.FolderUID)
-		dbDash, err := service.SaveFolderForProvisionedDashboards(ctx, dash)
+		// set LibraryElements folderUid if given
+		dash.LibraryElements.SetUid(cfg.FolderUID)
+		dbDash, err := service.SaveFolderForProvisionedLibraryElementss(ctx, dash)
 		if err != nil {
 			return 0, err
 		}
@@ -321,7 +321,7 @@ func (fr *FileReader) getOrCreateFolderID(ctx context.Context, cfg *config, serv
 	}
 
 	if !cmd.Result.IsFolder {
-		return 0, fmt.Errorf("got invalid response. expected folder, found dashboard")
+		return 0, fmt.Errorf("got invalid response. expected folder, found LibraryElements")
 	}
 
 	return cmd.Result.Id, nil
@@ -372,13 +372,13 @@ func validateWalkablePath(fileInfo os.FileInfo) (bool, error) {
 	return true, nil
 }
 
-type dashboardJSONFile struct {
-	dashboard    *dashboards.SaveDashboardDTO
-	checkSum     string
-	lastModified time.Time
+type LibraryElementsJSONFile struct {
+	LibraryElements *LibraryElementss.SaveLibraryElementsDTO
+	checkSum        string
+	lastModified    time.Time
 }
 
-func (fr *FileReader) readDashboardFromFile(path string, lastModified time.Time, folderID int64) (*dashboardJSONFile, error) {
+func (fr *FileReader) readLibraryElementsFromFile(path string, lastModified time.Time, folderID int64) (*LibraryElementsJSONFile, error) {
 	// nolint:gosec
 	// We can ignore the gosec G304 warning on this one because `path` comes from the provisioning configuration file.
 	reader, err := os.Open(path)
@@ -406,15 +406,15 @@ func (fr *FileReader) readDashboardFromFile(path string, lastModified time.Time,
 		return nil, err
 	}
 
-	dash, err := createDashboardJSON(data, lastModified, fr.Cfg, folderID)
+	dash, err := createLibraryElementsJSON(data, lastModified, fr.Cfg, folderID)
 	if err != nil {
 		return nil, err
 	}
 
-	return &dashboardJSONFile{
-		dashboard:    dash,
-		checkSum:     checkSum,
-		lastModified: lastModified,
+	return &LibraryElementsJSONFile{
+		LibraryElements: dash,
+		checkSum:        checkSum,
+		lastModified:    lastModified,
 	}, nil
 }
 
@@ -449,28 +449,28 @@ func (fr *FileReader) getUsageTracker() *usageTracker {
 
 type provisioningMetadata struct {
 	uid      string
-	identity dashboardIdentity
+	identity LibraryElementsIdentity
 }
 
-type dashboardIdentity struct {
+type LibraryElementsIdentity struct {
 	folderID int64
 	title    string
 }
 
-func (d *dashboardIdentity) Exists() bool {
+func (d *LibraryElementsIdentity) Exists() bool {
 	return len(d.title) > 0
 }
 
 func newUsageTracker() *usageTracker {
 	return &usageTracker{
 		uidUsage:   map[string]uint8{},
-		titleUsage: map[dashboardIdentity]uint8{},
+		titleUsage: map[LibraryElementsIdentity]uint8{},
 	}
 }
 
 type usageTracker struct {
 	uidUsage   map[string]uint8
-	titleUsage map[dashboardIdentity]uint8
+	titleUsage map[LibraryElementsIdentity]uint8
 }
 
 func (t *usageTracker) track(pm provisioningMetadata) {

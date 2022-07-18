@@ -1,4 +1,4 @@
-package dashboards
+package panelelements
 
 import (
 	"context"

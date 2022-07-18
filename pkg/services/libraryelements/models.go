@@ -4,6 +4,8 @@ import (
 	"encoding/json"
 	"errors"
 	"time"
+
+	"github.com/grafana/grafana/pkg/models"
 )
 
 type LibraryConnectionKind int
@@ -240,4 +242,13 @@ type LibraryElementConnectionsResponse struct {
 type DeleteLibraryElementResponse struct {
 	ID      int64  `json:"id"`
 	Message string `json:"message"`
+}
+
+type SaveLibraryElementDTO struct {
+	OrgId          int64
+	UpdatedAt      time.Time
+	User           *models.SignedInUser
+	Message        string
+	Overwrite      bool
+	LibraryElement *LibraryElement
 }

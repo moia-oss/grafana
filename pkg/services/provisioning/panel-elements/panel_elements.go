@@ -1,4 +1,4 @@
-package dashboards
+package panelelements
 
 import (
 	"context"
@@ -6,8 +6,7 @@ import (
 	"os"
 
 	"github.com/grafana/grafana/pkg/infra/log"
-	"github.com/grafana/grafana/pkg/models"
-	"github.com/grafana/grafana/pkg/services/dashboards"
+	"github.com/grafana/grafana/pkg/services/libraryelements"
 	"github.com/grafana/grafana/pkg/services/provisioning/utils"
 	"github.com/grafana/grafana/pkg/util/errutil"
 )
@@ -23,24 +22,24 @@ type PanelElementsProvisioner interface {
 }
 
 // PanelElementsProvisionerFactory creates PanelElementsProvisioners based on input
-type DashboardProvisionerFactory func(context.Context, string, dashboards.DashboardProvisioningService, utils.OrgStore) (DashboardProvisioner, error)
+type PanelElementsProvisionerFactory func(context.Context, string, libraryelements.LibraryElementsProvisioningService, utils.OrgStore) (PanelElementsProvisioner, error)
 
 // Provisioner is responsible for syncing dashboard from disk to Grafana's database.
 type Provisioner struct {
-	log                log.Logger
-	fileReaders        []*FileReader
-	configs            []*config
-	duplicateValidator duplicateValidator
-	provisioner        dashboards.DashboardProvisioningService
+	log         log.Logger
+	fileReaders []*FileReader
+	configs     []*config
+	// duplicateValidator duplicateValidator
+	provisioner libraryelements.LibraryElementsProvisioningService
 }
 
 // New returns a new DashboardProvisioner
-func New(ctx context.Context, configDirectory string, provisioner dashboards.DashboardProvisioningService, orgStore utils.OrgStore) (DashboardProvisioner, error) {
-	logger := log.New("provisioning.dashboard")
+func New(ctx context.Context, configDirectory string, provisioner libraryelements.LibraryElementsProvisioningService, orgStore utils.OrgStore) (PanelElementsProvisioner, error) {
+	logger := log.New("provisioning.panel-elements")
 	cfgReader := &configReader{path: configDirectory, log: logger, orgStore: orgStore}
 	configs, err := cfgReader.readConfig(ctx)
 	if err != nil {
-		return nil, errutil.Wrap("Failed to read dashboards config", err)
+		return nil, errutil.Wrap("Failed to read panel-elementss config", err)
 	}
 
 	fileReaders, err := getFileReaders(configs, logger, provisioner)
@@ -49,11 +48,11 @@ func New(ctx context.Context, configDirectory string, provisioner dashboards.Das
 	}
 
 	d := &Provisioner{
-		log:                logger,
-		fileReaders:        fileReaders,
-		configs:            configs,
-		duplicateValidator: newDuplicateValidator(logger, fileReaders),
-		provisioner:        provisioner,
+		log:         logger,
+		fileReaders: fileReaders,
+		configs:     configs,
+		// duplicateValidator: newDuplicateValidator(logger, fileReaders),
+		provisioner: provisioner,
 	}
 
 	return d, nil
@@ -74,22 +73,22 @@ func (provider *Provisioner) Provision(ctx context.Context) error {
 		}
 	}
 
-	provider.duplicateValidator.validate()
+	// provider.duplicateValidator.validate()
 	return nil
 }
 
-// CleanUpOrphanedDashboards deletes provisioned dashboards missing a linked reader.
-func (provider *Provisioner) CleanUpOrphanedDashboards(ctx context.Context) {
-	currentReaders := make([]string, len(provider.fileReaders))
+// // CleanUpOrphanedDashboards deletes provisioned dashboards missing a linked reader.
+// func (provider *Provisioner) CleanUpOrphanedDashboards(ctx context.Context) {
+// 	currentReaders := make([]string, len(provider.fileReaders))
 
-	for index, reader := range provider.fileReaders {
-		currentReaders[index] = reader.Cfg.Name
-	}
+// 	for index, reader := range provider.fileReaders {
+// 		currentReaders[index] = reader.Cfg.Name
+// 	}
 
-	if err := provider.provisioner.DeleteOrphanedProvisionedDashboards(ctx, &models.DeleteOrphanedProvisionedDashboardsCommand{ReaderNames: currentReaders}); err != nil {
-		provider.log.Warn("Failed to delete orphaned provisioned dashboards", "err", err)
-	}
-}
+// 	if err := provider.provisioner.DeleteOrphanedProvisionedDashboards(ctx, &models.DeleteOrphanedProvisionedDashboardsCommand{ReaderNames: currentReaders}); err != nil {
+// 		provider.log.Warn("Failed to delete orphaned provisioned dashboards", "err", err)
+// 	}
+// }
 
 // PollChanges starts polling for changes in dashboard definition files. It creates a goroutine for each provider
 // defined in the config.
@@ -98,7 +97,7 @@ func (provider *Provisioner) PollChanges(ctx context.Context) {
 		go reader.pollChanges(ctx)
 	}
 
-	go provider.duplicateValidator.Run(ctx)
+	// go provider.duplicateValidator.Run(ctx)
 }
 
 // GetProvisionerResolvedPath returns resolved path for the specified provisioner name. Can be used to generate
@@ -123,14 +122,14 @@ func (provider *Provisioner) GetAllowUIUpdatesFromConfig(name string) bool {
 }
 
 func getFileReaders(
-	configs []*config, logger log.Logger, service dashboards.DashboardProvisioningService,
+	configs []*config, logger log.Logger, service libraryelements.LibraryElementsProvisioningService,
 ) ([]*FileReader, error) {
 	var readers []*FileReader
 
 	for _, config := range configs {
 		switch config.Type {
 		case "file":
-			fileReader, err := NewDashboardFileReader(config, logger.New("type", config.Type, "name", config.Name), service)
+			fileReader, err := NewLibraryElementsFileReader(config, logger.New("type", config.Type, "name", config.Name), service)
 			if err != nil {
 				return nil, errutil.Wrapf(err, "Failed to create file reader for config %v", config.Name)
 			}
