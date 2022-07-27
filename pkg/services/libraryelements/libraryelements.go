@@ -42,6 +42,19 @@ type LibraryElementService struct {
 	log           log.Logger
 }
 
+//go:generate mockery --name LibraryElementsProvisioningService --structname FakeLibraryElementsProvisioning --inpackage --filename LibraryElements_provisioning_mock.go
+// LibraryElementsProvisioningService is a service for operating on provisioned LibraryElementss.
+type LibraryElementsProvisioningService interface {
+	// DeleteOrphanedProvisionedLibraryElementss(ctx context.Context, cmd *models.DeleteOrphanedProvisionedLibraryElementssCommand) error
+	DeleteProvisionedLibraryElements(ctx context.Context, LibraryElementsID int64, orgID int64) error
+	GetProvisionedLibraryElementsData(name string) ([]*LibraryElement, error)
+	GetProvisionedLibraryElementsDataByLibraryElementsID(LibraryElementsID int64) (*LibraryElement, error)
+	GetProvisionedLibraryElementsDataByLibraryElementsUID(orgID int64, LibraryElementsUID string) (*LibraryElement, error)
+	// SaveFolderForProvisionedLibraryElementss(context.Context, *SaveLibraryElementsDTO) (*LibraryElement, error)
+	SaveProvisionedLibraryElements(ctx context.Context, dto *SaveLibraryElementDTO, provisioning *LibraryElement) (*LibraryElement, error)
+	UnprovisionLibraryElements(ctx context.Context, LibraryElementsID int64) error
+}
+
 // CreateElement creates a Library Element.
 func (l *LibraryElementService) CreateElement(c context.Context, signedInUser *models.SignedInUser, cmd CreateLibraryElementCommand) (LibraryElementDTO, error) {
 	return l.createLibraryElement(c, signedInUser, cmd)

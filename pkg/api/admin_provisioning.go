@@ -16,6 +16,14 @@ func (hs *HTTPServer) AdminProvisioningReloadDashboards(c *models.ReqContext) re
 	return response.Success("Dashboards config reloaded")
 }
 
+func (hs *HTTPServer) AdminProvisioningReloadPanelElements(c *models.ReqContext) response.Response {
+	err := hs.ProvisioningService.ProvisionDashboards(c.Req.Context())
+	if err != nil && !errors.Is(err, context.Canceled) {
+		return response.Error(500, "", err)
+	}
+	return response.Success("Dashboards config reloaded")
+}
+
 func (hs *HTTPServer) AdminProvisioningReloadDatasources(c *models.ReqContext) response.Response {
 	err := hs.ProvisioningService.ProvisionDatasources(c.Req.Context())
 	if err != nil {

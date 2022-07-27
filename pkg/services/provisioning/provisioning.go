@@ -80,6 +80,7 @@ type ProvisioningService interface {
 	ProvisionNotifications(ctx context.Context) error
 	ProvisionDashboards(ctx context.Context) error
 	ProvisionAlertRules(ctx context.Context) error
+	ProvisionLibraryPanels(ctx context.Context) error
 	GetDashboardProvisionerResolvedPath(name string) string
 	GetAllowUIUpdatesFromConfig(name string) bool
 }
