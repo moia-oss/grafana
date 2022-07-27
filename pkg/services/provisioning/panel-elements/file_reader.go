@@ -15,7 +15,7 @@ import (
 	"github.com/grafana/grafana/pkg/components/simplejson"
 	"github.com/grafana/grafana/pkg/infra/log"
 	"github.com/grafana/grafana/pkg/models"
-	"github.com/grafana/grafana/pkg/services/LibraryElementss"
+	"github.com/grafana/grafana/pkg/services/libraryelements"
 	"github.com/grafana/grafana/pkg/util"
 )
 
@@ -31,7 +31,7 @@ type FileReader struct {
 	Cfg                                *config
 	Path                               string
 	log                                log.Logger
-	LibraryElementsProvisioningService LibraryElementss.LibraryElementsProvisioningService
+	LibraryElementsProvisioningService libraryelements.LibraryElementsProvisioningService
 	FoldersFromFilesStructure          bool
 
 	mux                     sync.RWMutex
@@ -40,7 +40,7 @@ type FileReader struct {
 }
 
 // NewLibraryElementsFileReader returns a new filereader based on `config`
-func NewLibraryElementsFileReader(cfg *config, log log.Logger, service LibraryElementss.LibraryElementsProvisioningService) (*FileReader, error) {
+func NewLibraryElementsFileReader(cfg *config, log log.Logger, service libraryelements.LibraryElementsProvisioningService) (*FileReader, error) {
 	var path string
 	path, ok := cfg.Options["path"].(string)
 	if !ok {
@@ -106,9 +106,9 @@ func (fr *FileReader) walkDisk(ctx context.Context) error {
 
 	usageTracker := newUsageTracker()
 	if fr.FoldersFromFilesStructure {
-		err = fr.storeLibraryElementssInFoldersFromFileStructure(ctx, filesFoundOnDisk, provisionedLibraryElementsRefs, resolvedPath, usageTracker)
+		err = fr.storeLibraryElementsInFoldersFromFileStructure(ctx, filesFoundOnDisk, provisionedLibraryElementsRefs, resolvedPath, usageTracker)
 	} else {
-		err = fr.storeLibraryElementssInFolder(ctx, filesFoundOnDisk, provisionedLibraryElementsRefs, usageTracker)
+		err = fr.storeLibraryElementsInFolder(ctx, filesFoundOnDisk, provisionedLibraryElementsRefs, usageTracker)
 	}
 	if err != nil {
 		return err
@@ -156,27 +156,27 @@ func (fr *FileReader) storeDashboardsInFolder(ctx context.Context, filesFoundOnD
 	return nil
 }
 
-// storeDashboardsInFoldersFromFilesystemStructure saves dashboards from the filesystem on disk to the same folder
+// storeLibraryElementsInFoldersFromFileStructure saves library elements from the filesystem on disk to the same folder
 // in Grafana as they are in on the filesystem.
-func (fr *FileReader) storeDashboardsInFoldersFromFileStructure(ctx context.Context, filesFoundOnDisk map[string]os.FileInfo,
+func (fr *FileReader) storeLibraryElementsInFoldersFromFileStructure(ctx context.Context, filesFoundOnDisk map[string]os.FileInfo,
 	dashboardRefs map[string]*models.DashboardProvisioning, resolvedPath string, usageTracker *usageTracker) error {
 	for path, fileInfo := range filesFoundOnDisk {
 		folderName := ""
 
-		dashboardsFolder := filepath.Dir(path)
-		if dashboardsFolder != resolvedPath {
-			folderName = filepath.Base(dashboardsFolder)
+		LibraryElementsFolder := filepath.Dir(path)
+		if LibraryElementsFolder != resolvedPath {
+			folderName = filepath.Base(LibraryElementsFolder)
 		}
 
-		folderID, err := fr.getOrCreateFolderID(ctx, fr.Cfg, fr.dashboardProvisioningService, folderName)
+		folderID, err := fr.getOrCreateFolderID(ctx, fr.Cfg, fr.LibraryElementsProvisioningService, folderName)
 		if err != nil && !errors.Is(err, ErrFolderNameMissing) {
 			return fmt.Errorf("can't provision folder %q from file system structure: %w", folderName, err)
 		}
 
-		provisioningMetadata, err := fr.saveDashboard(ctx, path, folderID, fileInfo, dashboardRefs)
+		provisioningMetadata, err := fr.saveLibraryElements(ctx, path, folderID, fileInfo, dashboardRefs)
 		usageTracker.track(provisioningMetadata)
 		if err != nil {
-			fr.log.Error("failed to save dashboard", "error", err)
+			fr.log.Error("failed to save library elements", "error", err)
 		}
 	}
 	return nil
@@ -218,7 +218,7 @@ func (fr *FileReader) handleMissingLibraryElementsFiles(ctx context.Context, pro
 
 // saveLibraryElements saves or updates the LibraryElements provisioning file at path.
 func (fr *FileReader) saveLibraryElements(ctx context.Context, path string, folderID int64, fileInfo os.FileInfo,
-	provisionedLibraryElementsRefs map[string]*models.LibraryElementsProvisioning) (provisioningMetadata, error) {
+	provisionedLibraryElementsRefs map[string]*libraryelements.LibraryElementsProvisioning) (provisioningMetadata, error) {
 	provisioningMetadata := provisioningMetadata{}
 	resolvedFileInfo, err := resolveSymlink(fileInfo, path)
 	if err != nil {
@@ -239,59 +239,59 @@ func (fr *FileReader) saveLibraryElements(ctx context.Context, path string, fold
 	}
 
 	// keeps track of which UIDs and titles we have already provisioned
-	dash := jsonFile.LibraryElements
-	provisioningMetadata.uid = dash.LibraryElements.Uid
-	provisioningMetadata.identity = LibraryElementsIdentity{title: dash.LibraryElements.Title, folderID: dash.LibraryElements.FolderId}
+	panel := jsonFile.LibraryElements
+	provisioningMetadata.uid = panel.LibraryElements.Uid
+	provisioningMetadata.identity = LibraryElementsIdentity{title: panel.LibraryElements.Title, folderID: panel.LibraryElements.FolderId}
 
 	if upToDate {
 		return provisioningMetadata, nil
 	}
 
-	if dash.LibraryElements.Id != 0 {
-		dash.LibraryElements.Data.Set("id", nil)
-		dash.LibraryElements.Id = 0
+	if panel.LibraryElements.Id != 0 {
+		panel.LibraryElements.Data.Set("id", nil)
+		panel.LibraryElements.Id = 0
 	}
 
 	if alreadyProvisioned {
-		dash.LibraryElements.SetId(provisionedData.LibraryElementsId)
+		panel.LibraryElements.SetId(provisionedData.LibraryElementsId)
 	}
 
 	if !fr.isDatabaseAccessRestricted() {
-		fr.log.Debug("saving new LibraryElements", "provisioner", fr.Cfg.Name, "file", path, "folderId", dash.LibraryElements.FolderId)
+		fr.log.Debug("saving new LibraryElements", "provisioner", fr.Cfg.Name, "file", path, "folderId", panel.LibraryElements.FolderId)
 		dp := &models.LibraryElementsProvisioning{
 			ExternalId: path,
 			Name:       fr.Cfg.Name,
 			Updated:    resolvedFileInfo.ModTime().Unix(),
 			CheckSum:   jsonFile.checkSum,
 		}
-		_, err := fr.LibraryElementsProvisioningService.SaveProvisionedLibraryElements(ctx, dash, dp)
+		_, err := fr.LibraryElementsProvisioningService.SaveProvisionedLibraryElements(ctx, panel, dp)
 		if err != nil {
 			return provisioningMetadata, err
 		}
 	} else {
 		fr.log.Warn("Not saving new LibraryElements due to restricted database access", "provisioner", fr.Cfg.Name,
-			"file", path, "folderId", dash.LibraryElements.FolderId)
+			"file", path, "folderId", panel.LibraryElements.FolderId)
 	}
 
 	return provisioningMetadata, nil
 }
 
-func getProvisionedLibraryElementssByPath(service LibraryElementss.LibraryElementsProvisioningService, name string) (
-	map[string]*models.LibraryElementsProvisioning, error) {
+func getProvisionedLibraryElementssByPath(service libraryelements.LibraryElementsProvisioningService, name string) (
+	map[string]*libraryelements.LibraryElementsProvisioning, error) {
 	arr, err := service.GetProvisionedLibraryElementsData(name)
 	if err != nil {
 		return nil, err
 	}
 
-	byPath := map[string]*models.LibraryElementsProvisioning{}
+	byPath := map[string]*libraryelements.LibraryElementsProvisioning{}
 	for _, pd := range arr {
-		byPath[pd.ExternalId] = pd
+		byPath[pd.ExternalID] = pd
 	}
 
 	return byPath, nil
 }
 
-func (fr *FileReader) getOrCreateFolderID(ctx context.Context, cfg *config, service LibraryElementss.LibraryElementsProvisioningService, folderName string) (int64, error) {
+func (fr *FileReader) getOrCreateFolderID(ctx context.Context, cfg *config, service libraryelements.LibraryElementsProvisioningService, folderName string) (int64, error) {
 	if folderName == "" {
 		return 0, ErrFolderNameMissing
 	}
@@ -305,14 +305,13 @@ func (fr *FileReader) getOrCreateFolderID(ctx context.Context, cfg *config, serv
 
 	// LibraryElements folder not found. create one.
 	if errors.Is(err, models.ErrLibraryElementsNotFound) {
-		dash := &LibraryElementss.SaveLibraryElementsDTO{}
-		dash.LibraryElements = models.NewLibraryElementsFolder(folderName)
-		dash.LibraryElements.IsFolder = true
-		dash.Overwrite = true
-		dash.OrgId = cfg.OrgID
+		panel := &libraryelements.SaveLibraryElementDTO{}
+		panel.LibraryElement = libraryelements.NewLibraryElementFolder(folderName)
+		panel.Overwrite = true
+		panel.OrgId = cfg.OrgID
 		// set LibraryElements folderUid if given
-		dash.LibraryElements.SetUid(cfg.FolderUID)
-		dbDash, err := service.SaveFolderForProvisionedLibraryElementss(ctx, dash)
+		panel.LibraryElement.UID = cfg.FolderUID
+		dbDash, err := service.SaveFolderForProvisionedLibraryElements(ctx, panel)
 		if err != nil {
 			return 0, err
 		}
@@ -373,7 +372,7 @@ func validateWalkablePath(fileInfo os.FileInfo) (bool, error) {
 }
 
 type LibraryElementsJSONFile struct {
-	LibraryElements *LibraryElementss.SaveLibraryElementsDTO
+	LibraryElements *libraryelements.SaveLibraryElementDTO
 	checkSum        string
 	lastModified    time.Time
 }

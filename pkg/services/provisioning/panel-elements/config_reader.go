@@ -39,25 +39,14 @@ func (cr *configReader) parseConfigs(file os.FileInfo) ([]*config, error) {
 	_ = yaml.Unmarshal(yamlFile, &apiVersion)
 
 	if apiVersion.APIVersion > 0 {
-		v1 := &configV1{}
+		v1 := &configV0{}
 		err := yaml.Unmarshal(yamlFile, &v1)
 		if err != nil {
 			return nil, err
 		}
 
 		if v1 != nil {
-			return v1.mapToDashboardsAsConfig()
-		}
-	} else {
-		var v0 []*configV0
-		err := yaml.Unmarshal(yamlFile, &v0)
-		if err != nil {
-			return nil, err
-		}
-
-		if v0 != nil {
-			cr.log.Warn("[Deprecated] the dashboard provisioning config is outdated. please upgrade", "filename", filename)
-			return mapV0ToDashboardsAsConfig(v0)
+			return v1.mapToPanelElementsAsConfig()
 		}
 	}
 
@@ -65,12 +54,12 @@ func (cr *configReader) parseConfigs(file os.FileInfo) ([]*config, error) {
 }
 
 func (cr *configReader) readConfig(ctx context.Context) ([]*config, error) {
-	var dashboards []*config
+	var panels []*config
 
 	files, err := ioutil.ReadDir(cr.path)
 	if err != nil {
 		cr.log.Error("can't read dashboard provisioning files from directory", "path", cr.path, "error", err)
-		return dashboards, nil
+		return panels, nil
 	}
 
 	for _, file := range files {
@@ -78,35 +67,35 @@ func (cr *configReader) readConfig(ctx context.Context) ([]*config, error) {
 			continue
 		}
 
-		parsedDashboards, err := cr.parseConfigs(file)
+		parsedPanels, err := cr.parseConfigs(file)
 		if err != nil {
 			return nil, fmt.Errorf("could not parse provisioning config file: %s error: %v", file.Name(), err)
 		}
 
-		if len(parsedDashboards) > 0 {
-			dashboards = append(dashboards, parsedDashboards...)
+		if len(parsedPanels) > 0 {
+			panels = append(panels, parsedPanels...)
 		}
 	}
 
 	uidUsage := map[string]uint8{}
-	for _, dashboard := range dashboards {
-		if dashboard.OrgID == 0 {
-			dashboard.OrgID = 1
+	for _, panel := range panels {
+		if panel.OrgID == 0 {
+			panel.OrgID = 1
 		}
 
-		if err := utils.CheckOrgExists(ctx, cr.orgStore, dashboard.OrgID); err != nil {
-			return nil, fmt.Errorf("failed to provision dashboards with %q reader: %w", dashboard.Name, err)
+		if err := utils.CheckOrgExists(ctx, cr.orgStore, panel.OrgID); err != nil {
+			return nil, fmt.Errorf("failed to provision panel with %q reader: %w", panel.Name, err)
 		}
 
-		if dashboard.Type == "" {
-			dashboard.Type = "file"
+		if panel.Type == "" {
+			panel.Type = "file"
 		}
 
-		if dashboard.UpdateIntervalSeconds == 0 {
-			dashboard.UpdateIntervalSeconds = 10
+		if panel.UpdateIntervalSeconds == 0 {
+			panel.UpdateIntervalSeconds = 10
 		}
-		if len(dashboard.FolderUID) > 0 {
-			uidUsage[dashboard.FolderUID]++
+		if len(panel.FolderUID) > 0 {
+			uidUsage[panel.FolderUID]++
 		}
 	}
 
@@ -116,5 +105,5 @@ func (cr *configReader) readConfig(ctx context.Context) ([]*config, error) {
 		}
 	}
 
-	return dashboards, nil
+	return panels, nil
 }

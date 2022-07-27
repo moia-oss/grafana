@@ -46,22 +46,22 @@ type configs struct {
 }
 
 func createPanelElementsJSON(data *simplejson.Json, lastModified time.Time, cfg *config, folderID int64) (*libraryelements.SaveLibraryElementDTO, error) {
-	dash := &libraryelements.SaveLibraryElementDTO{}
-	dash.PanelElements = models.NewPanelElementsFromJson(data)
-	dash.UpdatedAt = lastModified
-	dash.Overwrite = true
-	dash.OrgId = cfg.OrgID
-	dash.PanelElements.OrgId = cfg.OrgID
-	dash.PanelElements.FolderId = folderID
+	panel := &libraryelements.SaveLibraryElementDTO{}
+	panel.LibraryElement = models.NewPanelElementsFromJson(data)
+	panel.UpdatedAt = lastModified
+	panel.Overwrite = true
+	panel.OrgId = cfg.OrgID
+	panel.LibraryElement.OrgId = cfg.OrgID
+	panel.LibraryElement.FolderId = folderID
 
-	if dash.Dashboard.Title == "" {
+	if panel.Dashboard.Title == "" {
 		return nil, dashboards.ErrDashboardTitleEmpty
 	}
 
-	return dash, nil
+	return panel, nil
 }
 
-func (dc *configV0) mapToPanelElementssAsConfig() ([]*config, error) {
+func (dc *configV0) mapToPanelElementsAsConfig() ([]*config, error) {
 	var r []*config
 	seen := make(map[string]bool)
 

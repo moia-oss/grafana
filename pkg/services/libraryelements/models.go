@@ -5,6 +5,7 @@ import (
 	"errors"
 	"time"
 
+	"github.com/grafana/grafana/pkg/components/simplejson"
 	"github.com/grafana/grafana/pkg/models"
 )
 
@@ -32,6 +33,38 @@ type LibraryElement struct {
 
 	CreatedBy int64
 	UpdatedBy int64
+}
+
+func NewLibraryElementFromJson(data json.RawMessage) *LibraryElement {
+	panel := &LibraryElement{}
+	panel.Model = data
+	update := false
+
+	j, err := simplejson.NewJson(data)
+	if err != nil {
+
+	}
+
+	if id, err := j.Get("id").Int64(); err == nil {
+		panel.ID = id
+		update = true
+	}
+
+	if uid, err := j.Get("uid").String(); err == nil {
+		panel.UID = uid
+		update = true
+	}
+
+	if version, err := j.Get("version").Int64(); err == nil && update {
+		panel.Version = version
+		panel.Updated = time.Now()
+	} else {
+		j.Set("version", 0)
+		panel.Created = time.Now()
+		panel.Updated = time.Now()
+	}
+
+	return panel
 }
 
 // LibraryElementWithMeta is the model used to retrieve entities with additional meta information.
