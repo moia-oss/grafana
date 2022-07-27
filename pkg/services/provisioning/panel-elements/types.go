@@ -5,8 +5,6 @@ import (
 	"time"
 
 	"github.com/grafana/grafana/pkg/components/simplejson"
-	"github.com/grafana/grafana/pkg/models"
-	"github.com/grafana/grafana/pkg/services/dashboards"
 	"github.com/grafana/grafana/pkg/services/libraryelements"
 	"github.com/grafana/grafana/pkg/services/provisioning/values"
 )
@@ -47,16 +45,12 @@ type configs struct {
 
 func createPanelElementsJSON(data *simplejson.Json, lastModified time.Time, cfg *config, folderID int64) (*libraryelements.SaveLibraryElementDTO, error) {
 	panel := &libraryelements.SaveLibraryElementDTO{}
-	panel.LibraryElement = models.NewPanelElementsFromJson(data)
+	panel.LibraryElement = libraryelements.NewLibraryElementFromJson(data)
 	panel.UpdatedAt = lastModified
 	panel.Overwrite = true
 	panel.OrgId = cfg.OrgID
-	panel.LibraryElement.OrgId = cfg.OrgID
-	panel.LibraryElement.FolderId = folderID
-
-	if panel.Dashboard.Title == "" {
-		return nil, dashboards.ErrDashboardTitleEmpty
-	}
+	panel.LibraryElement.OrgID = cfg.OrgID
+	panel.LibraryElement.FolderID = folderID
 
 	return panel, nil
 }

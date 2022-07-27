@@ -25,7 +25,7 @@ type LibraryElement struct {
 	Kind        int64
 	Type        string
 	Description string
-	Model       json.RawMessage
+	Model       *simplejson.Json
 	Version     int64
 
 	Created time.Time
@@ -35,31 +35,26 @@ type LibraryElement struct {
 	UpdatedBy int64
 }
 
-func NewLibraryElementFromJson(data json.RawMessage) *LibraryElement {
+func NewLibraryElementFromJson(data *simplejson.Json) *LibraryElement {
 	panel := &LibraryElement{}
 	panel.Model = data
 	update := false
 
-	j, err := simplejson.NewJson(data)
-	if err != nil {
-
-	}
-
-	if id, err := j.Get("id").Int64(); err == nil {
+	if id, err := panel.Model.Get("id").Int64(); err == nil {
 		panel.ID = id
 		update = true
 	}
 
-	if uid, err := j.Get("uid").String(); err == nil {
+	if uid, err := panel.Model.Get("uid").String(); err == nil {
 		panel.UID = uid
 		update = true
 	}
 
-	if version, err := j.Get("version").Int64(); err == nil && update {
+	if version, err := panel.Model.Get("version").Int64(); err == nil && update {
 		panel.Version = version
 		panel.Updated = time.Now()
 	} else {
-		j.Set("version", 0)
+		panel.Model.Set("version", 0)
 		panel.Created = time.Now()
 		panel.Updated = time.Now()
 	}

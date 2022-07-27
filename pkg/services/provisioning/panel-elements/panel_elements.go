@@ -8,7 +8,6 @@ import (
 	"github.com/grafana/grafana/pkg/infra/log"
 	"github.com/grafana/grafana/pkg/services/libraryelements"
 	"github.com/grafana/grafana/pkg/services/provisioning/utils"
-	"github.com/grafana/grafana/pkg/util/errutil"
 )
 
 // PanelElementsProvisioner is responsible for syncing dashboard from disk to
@@ -33,18 +32,18 @@ type Provisioner struct {
 	provisioner libraryelements.LibraryElementsProvisioningService
 }
 
-// New returns a new DashboardProvisioner
-func New(ctx context.Context, configDirectory string, provisioner libraryelements.LibraryElementsProvisioningService, orgStore utils.OrgStore) (PanelElementsProvisioner, error) {
+// New returns a new Provisioner
+func New(ctx context.Context, configDirectory string, provisioner libraryelements.LibraryElementsProvisioningService, orgStore utils.OrgStore) (*Provisioner, error) {
 	logger := log.New("provisioning.panel-elements")
 	cfgReader := &configReader{path: configDirectory, log: logger, orgStore: orgStore}
 	configs, err := cfgReader.readConfig(ctx)
 	if err != nil {
-		return nil, errutil.Wrap("Failed to read panel-elementss config", err)
+		return nil, fmt.Errorf("Failed to read panel-elements config: %w", err)
 	}
 
 	fileReaders, err := getFileReaders(configs, logger, provisioner)
 	if err != nil {
-		return nil, errutil.Wrap("Failed to initialize file readers", err)
+		return nil, fmt.Errorf("Failed to initialize file readers: %w", err)
 	}
 
 	d := &Provisioner{
@@ -69,7 +68,7 @@ func (provider *Provisioner) Provision(ctx context.Context) error {
 				return nil
 			}
 
-			return errutil.Wrapf(err, "Failed to provision config %v", reader.Cfg.Name)
+			return fmt.Errorf("Failed to provision config %v: %w", reader.Cfg.Name, err)
 		}
 	}
 
@@ -131,7 +130,7 @@ func getFileReaders(
 		case "file":
 			fileReader, err := NewLibraryElementsFileReader(config, logger.New("type", config.Type, "name", config.Name), service)
 			if err != nil {
-				return nil, errutil.Wrapf(err, "Failed to create file reader for config %v", config.Name)
+				return nil, fmt.Errorf("Failed to create file reader for config %v: %w", config.Name, err)
 			}
 			readers = append(readers, fileReader)
 		default:

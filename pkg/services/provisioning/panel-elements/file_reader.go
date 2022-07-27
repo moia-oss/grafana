@@ -186,18 +186,18 @@ func (fr *FileReader) storeLibraryElementsInFoldersFromFileStructure(ctx context
 func (fr *FileReader) handleMissingLibraryElementsFiles(ctx context.Context, provisionedLibraryElementsRefs map[string]*models.LibraryElementsProvisioning,
 	filesFoundOnDisk map[string]os.FileInfo) {
 	// find LibraryElementss to delete since json file is missing
-	var LibraryElementssToDelete []int64
+	var LibraryElementsToDelete []int64
 	for path, provisioningData := range provisionedLibraryElementsRefs {
 		_, existsOnDisk := filesFoundOnDisk[path]
 		if !existsOnDisk {
-			LibraryElementssToDelete = append(LibraryElementssToDelete, provisioningData.LibraryElementsId)
+			LibraryElementsToDelete = append(LibraryElementsToDelete, provisioningData.LibraryElementsId)
 		}
 	}
 
 	if fr.Cfg.DisableDeletion {
 		// If deletion is disabled for the provisioner we just remove provisioning metadata about the LibraryElements
 		// so afterwards the LibraryElements is considered unprovisioned.
-		for _, LibraryElementsID := range LibraryElementssToDelete {
+		for _, LibraryElementsID := range LibraryElementsToDelete {
 			fr.log.Debug("unprovisioning provisioned LibraryElements. missing on disk", "id", LibraryElementsID)
 			err := fr.LibraryElementsProvisioningService.UnprovisionLibraryElements(ctx, LibraryElementsID)
 			if err != nil {
@@ -205,8 +205,8 @@ func (fr *FileReader) handleMissingLibraryElementsFiles(ctx context.Context, pro
 			}
 		}
 	} else {
-		// delete LibraryElementss missing JSON file
-		for _, LibraryElementsID := range LibraryElementssToDelete {
+		// delete LibraryElements missing JSON file
+		for _, LibraryElementsID := range LibraryElementsToDelete {
 			fr.log.Debug("deleting provisioned LibraryElements, missing on disk", "id", LibraryElementsID)
 			err := fr.LibraryElementsProvisioningService.DeleteProvisionedLibraryElements(ctx, LibraryElementsID, fr.Cfg.OrgID)
 			if err != nil {
@@ -240,16 +240,16 @@ func (fr *FileReader) saveLibraryElements(ctx context.Context, path string, fold
 
 	// keeps track of which UIDs and titles we have already provisioned
 	panel := jsonFile.LibraryElements
-	provisioningMetadata.uid = panel.LibraryElements.Uid
-	provisioningMetadata.identity = LibraryElementsIdentity{title: panel.LibraryElements.Title, folderID: panel.LibraryElements.FolderId}
+	provisioningMetadata.uid = panel.LibraryElement.UID
+	provisioningMetadata.identity = LibraryElementsIdentity{folderID: panel.LibraryElement.FolderID}
 
 	if upToDate {
 		return provisioningMetadata, nil
 	}
 
-	if panel.LibraryElements.Id != 0 {
-		panel.LibraryElements.Data.Set("id", nil)
-		panel.LibraryElements.Id = 0
+	if panel.LibraryElement.ID != 0 {
+		panel.LibraryElement.Model.Set("id", nil)
+		panel.LibraryElement.ID = 0
 	}
 
 	if alreadyProvisioned {
