@@ -253,15 +253,14 @@ func (fr *FileReader) saveLibraryElements(ctx context.Context, path string, fold
 	}
 
 	if alreadyProvisioned {
-		panel.LibraryElement.ID = provisionedData.LibraryElementsID
+		panel.LibraryElement.ID = provisionedData.ID
 	}
 
 	if !fr.isDatabaseAccessRestricted() {
 		fr.log.Debug("saving new LibraryElements", "provisioner", fr.Cfg.Name, "file", path, "folderId", panel.LibraryElement.FolderID)
 		dp := &libraryelements.LibraryElement{
-			ExternalID: path,
-			Name:       fr.Cfg.Name,
-			Updated:    resolvedFileInfo.ModTime().Unix(),
+			Name:    fr.Cfg.Name,
+			Updated: resolvedFileInfo.ModTime(),
 		}
 		_, err := fr.LibraryElementsProvisioningService.SaveProvisionedLibraryElements(ctx, panel, dp)
 		if err != nil {

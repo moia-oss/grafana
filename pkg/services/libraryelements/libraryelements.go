@@ -51,7 +51,7 @@ type LibraryElementsProvisioningService interface {
 	GetProvisionedLibraryElementsDataByLibraryElementsID(LibraryElementsID int64) (*LibraryElement, error)
 	GetProvisionedLibraryElementsDataByLibraryElementsUID(orgID int64, LibraryElementsUID string) (*LibraryElement, error)
 	// SaveFolderForProvisionedLibraryElementss(context.Context, *SaveLibraryElementsDTO) (*LibraryElement, error)
-	// SaveProvisionedLibraryElements(ctx context.Context, dto *SaveLibraryElementsDTO, provisioning *LibraryElement) (*LibraryElement, error)
+	SaveProvisionedLibraryElements(ctx context.Context, dto *SaveLibraryElementDTO, provisioning *LibraryElement) (*LibraryElement, error)
 	UnprovisionLibraryElements(ctx context.Context, LibraryElementsID int64) error
 }
 
