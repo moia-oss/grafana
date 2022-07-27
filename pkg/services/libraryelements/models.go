@@ -33,6 +33,8 @@ type LibraryElement struct {
 
 	CreatedBy int64
 	UpdatedBy int64
+
+	CheckSum string
 }
 
 func NewLibraryElementFromJson(data *simplejson.Json) *LibraryElement {

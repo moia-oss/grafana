@@ -136,18 +136,18 @@ func (fr *FileReader) isDatabaseAccessRestricted() bool {
 }
 
 // storeLibraryElementssInFolder saves dashboards from the filesystem on disk to the folder from config
-func (fr *FileReader) storeDashboardsInFolder(ctx context.Context, filesFoundOnDisk map[string]os.FileInfo,
-	dashboardRefs map[string]*models.DashboardProvisioning, usageTracker *usageTracker) error {
-	folderID, err := fr.getOrCreateFolderID(ctx, fr.Cfg, fr.dashboardProvisioningService, fr.Cfg.Folder)
+func (fr *FileReader) storeLibraryElementsInFolder(ctx context.Context, filesFoundOnDisk map[string]os.FileInfo,
+	panelRefs map[string]*libraryelements.LibraryElementsProvisioningService, usageTracker *usageTracker) error {
+	folderID, err := fr.getOrCreateFolderID(ctx, fr.Cfg, fr.LibraryElementsProvisioningService, fr.Cfg.Folder)
 	if err != nil && !errors.Is(err, ErrFolderNameMissing) {
 		return err
 	}
 
-	// save dashboards based on json files
+	// save library elements based on json files
 	for path, fileInfo := range filesFoundOnDisk {
-		provisioningMetadata, err := fr.saveDashboard(ctx, path, folderID, fileInfo, dashboardRefs)
+		provisioningMetadata, err := fr.saveLibraryElements(ctx, path, folderID, fileInfo, panelRefs)
 		if err != nil {
-			fr.log.Error("failed to save dashboard", "error", err)
+			fr.log.Error("failed to save library element", "error", err)
 			continue
 		}
 
@@ -159,7 +159,7 @@ func (fr *FileReader) storeDashboardsInFolder(ctx context.Context, filesFoundOnD
 // storeLibraryElementsInFoldersFromFileStructure saves library elements from the filesystem on disk to the same folder
 // in Grafana as they are in on the filesystem.
 func (fr *FileReader) storeLibraryElementsInFoldersFromFileStructure(ctx context.Context, filesFoundOnDisk map[string]os.FileInfo,
-	dashboardRefs map[string]*models.DashboardProvisioning, resolvedPath string, usageTracker *usageTracker) error {
+	panelRefs map[string]*libraryelements.LibraryElementsProvisioningService, resolvedPath string, usageTracker *usageTracker) error {
 	for path, fileInfo := range filesFoundOnDisk {
 		folderName := ""
 
@@ -173,7 +173,7 @@ func (fr *FileReader) storeLibraryElementsInFoldersFromFileStructure(ctx context
 			return fmt.Errorf("can't provision folder %q from file system structure: %w", folderName, err)
 		}
 
-		provisioningMetadata, err := fr.saveLibraryElements(ctx, path, folderID, fileInfo, dashboardRefs)
+		provisioningMetadata, err := fr.saveLibraryElements(ctx, path, folderID, fileInfo, panelRefs)
 		usageTracker.track(provisioningMetadata)
 		if err != nil {
 			fr.log.Error("failed to save library elements", "error", err)
@@ -218,7 +218,7 @@ func (fr *FileReader) handleMissingLibraryElementsFiles(ctx context.Context, pro
 
 // saveLibraryElements saves or updates the LibraryElements provisioning file at path.
 func (fr *FileReader) saveLibraryElements(ctx context.Context, path string, folderID int64, fileInfo os.FileInfo,
-	provisionedLibraryElementsRefs map[string]*libraryelements.LibraryElementsProvisioning) (provisioningMetadata, error) {
+	provisionedLibraryElementsRefs map[string]*libraryelements.LibraryElement) (provisioningMetadata, error) {
 	provisioningMetadata := provisioningMetadata{}
 	resolvedFileInfo, err := resolveSymlink(fileInfo, path)
 	if err != nil {
@@ -253,16 +253,15 @@ func (fr *FileReader) saveLibraryElements(ctx context.Context, path string, fold
 	}
 
 	if alreadyProvisioned {
-		panel.LibraryElements.SetId(provisionedData.LibraryElementsId)
+		panel.LibraryElement.ID = provisionedData.LibraryElementsID
 	}
 
 	if !fr.isDatabaseAccessRestricted() {
-		fr.log.Debug("saving new LibraryElements", "provisioner", fr.Cfg.Name, "file", path, "folderId", panel.LibraryElements.FolderId)
-		dp := &models.LibraryElementsProvisioning{
-			ExternalId: path,
+		fr.log.Debug("saving new LibraryElements", "provisioner", fr.Cfg.Name, "file", path, "folderId", panel.LibraryElement.FolderID)
+		dp := &libraryelements.LibraryElement{
+			ExternalID: path,
 			Name:       fr.Cfg.Name,
 			Updated:    resolvedFileInfo.ModTime().Unix(),
-			CheckSum:   jsonFile.checkSum,
 		}
 		_, err := fr.LibraryElementsProvisioningService.SaveProvisionedLibraryElements(ctx, panel, dp)
 		if err != nil {
@@ -270,7 +269,7 @@ func (fr *FileReader) saveLibraryElements(ctx context.Context, path string, fold
 		}
 	} else {
 		fr.log.Warn("Not saving new LibraryElements due to restricted database access", "provisioner", fr.Cfg.Name,
-			"file", path, "folderId", panel.LibraryElements.FolderId)
+			"file", path, "folderId", panel.LibraryElement.FolderID)
 	}
 
 	return provisioningMetadata, nil
